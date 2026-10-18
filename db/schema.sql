@@ -171,18 +171,22 @@ CREATE INDEX knowledge_chunks_company_idx ON knowledge_chunks (company_id);
 CREATE INDEX knowledge_chunks_embedding_idx ON knowledge_chunks USING hnsw (embedding vector_cosine_ops);
 
 CREATE TABLE tiktok_connections (
-  id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id               uuid NOT NULL UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
-  advertiser_id            text,             -- TikTok Ads Manager account
-  business_open_id         text,             -- TikTok account used for organic posts
-  access_token_enc         text NOT NULL,    -- AES-256-GCM with ENCRYPTION_KEY
-  refresh_token_enc        text,
-  scopes                   text[] NOT NULL DEFAULT '{}',
-  expires_at               timestamptz,
-  status                   connection_status NOT NULL DEFAULT 'connected',
-  connected_by             uuid REFERENCES users(id) ON DELETE SET NULL,
-  created_at               timestamptz NOT NULL DEFAULT now(),
-  updated_at               timestamptz NOT NULL DEFAULT now()
+  id                         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id                 uuid NOT NULL UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
+  -- TikTok Ads Manager (Marketing API). Long-lived token, AES-256-GCM with ENCRYPTION_KEY.
+  advertiser_id              text,
+  ads_access_token_enc       text,
+  -- TikTok account used for organic posts (Content Posting API). Expires; refreshed.
+  business_open_id           text,
+  posting_access_token_enc   text,
+  posting_refresh_token_enc  text,
+  posting_expires_at         timestamptz,
+  scopes                     text[] NOT NULL DEFAULT '{}',
+  status                     connection_status NOT NULL DEFAULT 'connected',
+  connected_by               uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at                 timestamptz NOT NULL DEFAULT now(),
+  updated_at                 timestamptz NOT NULL DEFAULT now(),
+  CHECK (ads_access_token_enc IS NOT NULL OR posting_access_token_enc IS NOT NULL)
 );
 
 -- -----------------------------------------------------------------------------
@@ -330,7 +334,8 @@ CREATE TABLE audience_segments (
   genders        text[] NOT NULL DEFAULT '{}',   -- GENDER_MALE | GENDER_FEMALE | GENDER_UNLIMITED
   location_ids   text[] NOT NULL DEFAULT '{}',
   languages      text[] NOT NULL DEFAULT '{}',
-  interest_category_ids text[] NOT NULL DEFAULT '{}',
+  interest_labels text[] NOT NULL DEFAULT '{}',          -- what the agent asked for, e.g. 'Food & Drink'
+  interest_category_ids text[] NOT NULL DEFAULT '{}',    -- resolved TikTok ids
   action_category_ids   text[] NOT NULL DEFAULT '{}',  -- behaviours: watched/engaged with similar content
   hashtag_ids    text[] NOT NULL DEFAULT '{}',
   rationale      text NOT NULL,

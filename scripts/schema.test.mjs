@@ -98,7 +98,7 @@ test('onboard a client with brand, portfolio and TikTok connection', async () =>
     )
   ).id;
   await db.query(
-    `INSERT INTO tiktok_connections (company_id, advertiser_id, access_token_enc, scopes) VALUES ($1, '7000', 'enc', '{ad.manage}')`,
+    `INSERT INTO tiktok_connections (company_id, advertiser_id, ads_access_token_enc, scopes) VALUES ($1, '7000', 'enc', '{ad.manage}')`,
     [ids.company],
   );
 });

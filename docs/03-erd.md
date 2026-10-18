@@ -162,7 +162,8 @@ erDiagram
         uuid company_id FK,UK
         text advertiser_id
         text business_open_id
-        text access_token_enc "AES-256-GCM"
+        text ads_access_token_enc "AES-256-GCM"
+        text posting_access_token_enc "AES-256-GCM"
         connection_status status
     }
     monthly_goals {

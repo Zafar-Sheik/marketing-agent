@@ -39,7 +39,10 @@ export async function createPglite(dataDir?: string) {
   const { PGlite } = await import('@electric-sql/pglite');
   const { vector } = await import('@electric-sql/pglite-pgvector');
   if (dataDir) await mkdir(path.resolve(dataDir), { recursive: true });
-  const pg = new PGlite(dataDir ? path.resolve(dataDir) : undefined, { extensions: { vector } });
+  // Pass options as the only argument when in-memory: PGlite ignores them after an undefined dataDir.
+  const pg = dataDir
+    ? new PGlite(path.resolve(dataDir), { extensions: { vector } })
+    : new PGlite({ extensions: { vector } });
   const { rows } = await pg.query<{ exists: boolean }>(
     `SELECT to_regclass('public.companies') IS NOT NULL AS exists`,
   );
