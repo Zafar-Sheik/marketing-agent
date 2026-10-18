@@ -1,6 +1,6 @@
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { schema, type Db } from '@/db';
-import { currentBrand } from '@/lib/agents/context';
+import { createNewBrandVersion } from './companies';
 import { creativeFiles } from '@/lib/assets';
 
 /** Choose a logo concept: it becomes the brand logo in a new brand profile version. */
@@ -21,16 +21,6 @@ export async function selectLogo(db: Db, logoRequestId: string, creativeId: stri
     .set({ status: 'rejected' })
     .where(and(eq(schema.creatives.logoRequestId, logoRequestId), ne(schema.creatives.id, creativeId)));
 
-  const brand = await currentBrand(db, request.companyId);
-  const [{ max }] = await db
-    .select({ max: sql<number>`coalesce(max(${schema.brandProfiles.version}), 0)` })
-    .from(schema.brandProfiles)
-    .where(eq(schema.brandProfiles.companyId, request.companyId));
-  if (brand) await db.update(schema.brandProfiles).set({ isCurrent: false }).where(eq(schema.brandProfiles.id, brand.id));
-  const { id: _id, createdAt: _c, version: _v, ...rest } = brand ?? ({} as NonNullable<typeof brand>);
-  const [profile] = await db
-    .insert(schema.brandProfiles)
-    .values({ ...rest, companyId: request.companyId, version: Number(max) + 1, isCurrent: true, logoAssetId: file.asset.id })
-    .returning();
+  const profile = await createNewBrandVersion(db, request.companyId, { logoAssetId: file.asset.id });
   return profile;
 }
