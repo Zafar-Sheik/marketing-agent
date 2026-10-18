@@ -5,20 +5,53 @@
   "description": "Autonomous TikTok marketing agency: brand training, market research, monthly plans, creative generation, ad buying and publishing.",
   "type": "module",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node scripts/migrate.mjs",
+    "n8n:import": "node scripts/n8n-import.mjs",
     "env:setup": "node scripts/env.mjs setup",
     "env:check": "node scripts/env.mjs check",
     "diagrams:render": "node scripts/render-diagrams.mjs",
     "test:diagrams": "node scripts/render-diagrams.mjs --check",
     "test:schema": "node --test scripts/schema.test.mjs",
     "test:env": "node --test scripts/env.test.mjs",
-    "test": "npm run test:diagrams && npm run test:schema && npm run test:env"
+    "test": "npm run typecheck && npm run test:unit && npm run test:schema && npm run test:env && npm run test:diagrams",
+    "test:unit": "vitest run"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.10",
-    "@electric-sql/pglite-pgvector": "^0.0.11",
-    "@mermaid-js/mermaid-cli": "11.17.0"
+    "@mermaid-js/mermaid-cli": "11.17.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.135.0",
+    "@aws-sdk/client-s3": "3.1152.0",
+    "@aws-sdk/s3-request-presigner": "3.1152.0",
+    "@electric-sql/pglite": "0.5.10",
+    "@electric-sql/pglite-pgvector": "0.0.11",
+    "@neondatabase/serverless": "1.2.0",
+    "@react-pdf/renderer": "4.9.0",
+    "clsx": "2.1.1",
+    "drizzle-orm": "0.45.4",
+    "lucide-react": "1.59.0",
+    "motion": "14.3.0",
+    "next": "16.4.2",
+    "next-auth": "5.0.0-beta.32",
+    "openai": "7.38.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "resend": "6.34.1",
+    "tailwind-merge": "3.7.0",
+    "zod": "4.6.7"
   }
 }
