@@ -205,7 +205,9 @@ describe('a client month, end to end (offline providers)', () => {
     expect(await failedRuns()).toEqual([]);
     const concepts = await db.select().from(schema.creatives).where(eq(schema.creatives.logoRequestId, req.id));
     expect(concepts).toHaveLength(3);
-    await selectLogo(db, req.id, concepts[1].id);
+    // Another company's id can't be used to select this request's concept.
+    await expect(selectLogo(db, req.id, concepts[1].id, crypto.randomUUID())).rejects.toThrow(/not found/);
+    await selectLogo(db, req.id, concepts[1].id, ids.company);
     const brands = await db.select().from(schema.brandProfiles).where(and(eq(schema.brandProfiles.companyId, ids.company), eq(schema.brandProfiles.isCurrent, true)));
     expect(brands).toHaveLength(1);
     expect(brands[0].logoAssetId).toBeTruthy();

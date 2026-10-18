@@ -4,8 +4,11 @@ import { createNewBrandVersion } from './companies';
 import { creativeFiles } from '@/lib/assets';
 
 /** Choose a logo concept: it becomes the brand logo in a new brand profile version. */
-export async function selectLogo(db: Db, logoRequestId: string, creativeId: string) {
-  const [request] = await db.select().from(schema.logoRequests).where(eq(schema.logoRequests.id, logoRequestId));
+export async function selectLogo(db: Db, logoRequestId: string, creativeId: string, companyId?: string) {
+  const [request] = await db
+    .select()
+    .from(schema.logoRequests)
+    .where(and(eq(schema.logoRequests.id, logoRequestId), companyId ? eq(schema.logoRequests.companyId, companyId) : undefined));
   const [creative] = await db
     .select()
     .from(schema.creatives)

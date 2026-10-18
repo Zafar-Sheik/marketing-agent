@@ -245,7 +245,7 @@ export async function logoRequestAction(companyId: string, _: ActionState, form:
 
 export async function selectLogoAction(companyId: string, logoRequestId: string, creativeId: string) {
   const { db, company } = await editor(companyId);
-  await selectLogo(db, logoRequestId, creativeId);
+  await selectLogo(db, logoRequestId, creativeId, companyId);
   revalidatePath(`/companies/${company.slug}`, 'layout');
 }
 
