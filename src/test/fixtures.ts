@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { inArray } from 'drizzle-orm';
+import { and, inArray, sql } from 'drizzle-orm';
 import { schema, type Db } from '@/db';
 import { setProviders } from '@/lib/providers';
 import { mockProviders } from '@/lib/providers/mock';
@@ -50,11 +50,15 @@ export async function seedCompany(db: Db, opts: { autopilot?: boolean; budgetCen
   return { user, ws, company, goal, plan };
 }
 
+/** Wait until no run is executing (runs sleeping until a future time count as idle). */
 export async function idle(db: Db, timeoutMs = 20_000) {
   const start = Date.now();
   let quiet = 0;
   while (Date.now() - start < timeoutMs) {
-    const busy = await db.select({ id: schema.agentRuns.id }).from(schema.agentRuns).where(inArray(schema.agentRuns.status, ['queued', 'running']));
+    const busy = await db
+      .select({ id: schema.agentRuns.id })
+      .from(schema.agentRuns)
+      .where(and(inArray(schema.agentRuns.status, ['queued', 'running']), sql`${schema.agentRuns.output}->>'wakeAt' is null`));
     quiet = busy.length ? 0 : quiet + 1;
     if (quiet >= 3) return;
     await new Promise((r) => setTimeout(r, 30));

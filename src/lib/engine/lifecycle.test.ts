@@ -14,24 +14,14 @@ import { monthStart, toIsoDate } from '@/lib/domain/dates';
 import { startWorkflow, setInlineWaitScale } from './runs';
 import { decide } from '@/lib/services/approvals';
 import { selectLogo } from '@/lib/services/logos';
+import { idle as waitIdle } from '@/test/fixtures';
 
 let db: Db;
 let p: ReturnType<typeof mockProviders>;
 const ids: Record<string, string> = {};
 const month = monthStart(new Date());
 
-/** Inline runs are fire-and-forget; wait until nothing is queued or running. */
-async function idle(timeoutMs = 20_000) {
-  const start = Date.now();
-  let quiet = 0;
-  while (Date.now() - start < timeoutMs) {
-    const busy = await db.select({ id: schema.agentRuns.id }).from(schema.agentRuns).where(inArray(schema.agentRuns.status, ['queued', 'running']));
-    quiet = busy.length ? 0 : quiet + 1;
-    if (quiet >= 3) return;
-    await new Promise((r) => setTimeout(r, 30));
-  }
-  throw new Error('runs did not finish');
-}
+const idle = () => waitIdle(db);
 
 async function failedRuns() {
   return db.select().from(schema.agentRuns).where(eq(schema.agentRuns.status, 'failed'));
@@ -165,8 +155,16 @@ describe('a client month, end to end (offline providers)', () => {
     await idle();
     expect(await failedRuns()).toEqual([]);
     const posts = await db.select().from(schema.organicPosts);
-    expect(posts.length).toBeGreaterThan(0);
-    expect(posts.every((p) => p.status === 'published' && p.tiktokPostId)).toBe(true);
+    const due = posts.filter((p) => p.scheduledFor <= new Date());
+    const later = posts.filter((p) => p.scheduledFor > new Date());
+    expect(due.length).toBeGreaterThan(0);
+    expect(due.every((p) => p.status === 'published' && p.tiktokPostId)).toBe(true);
+    // Future posts are never published early: their runs sleep until the scheduled time.
+    expect(later.every((p) => p.status === 'scheduled')).toBe(true);
+    for (const p of later) {
+      const [run] = await db.select().from(schema.agentRuns).where(eq(schema.agentRuns.subjectId, p.id));
+      expect((run.output as { wakeAt?: string }).wakeAt).toBeTruthy();
+    }
 
     const campaigns = await db.select().from(schema.adCampaigns);
     expect(campaigns.length).toBeGreaterThan(0);
@@ -236,7 +234,8 @@ describe('a client month, end to end (offline providers)', () => {
 
   it('records cost and a log on every run', async () => {
     const runs = await db.select().from(schema.agentRuns);
-    expect(runs.every((r) => r.status === 'succeeded')).toBe(true);
+    // Everything finished except posts sleeping until their scheduled time.
+    expect(runs.filter((r) => r.status !== 'succeeded').every((r) => r.workflow === 'organic-publish' && (r.output as { wakeAt?: string }).wakeAt)).toBe(true);
     expect(runs.every((r) => Array.isArray((r.output as { log?: unknown[] }).log))).toBe(true);
   });
 });

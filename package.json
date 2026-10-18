@@ -17,11 +17,15 @@
     "test:diagrams": "node scripts/render-diagrams.mjs --check",
     "test:schema": "node --test scripts/schema.test.mjs",
     "test:env": "node --test scripts/env.test.mjs",
-    "test": "npm run typecheck && npm run test:unit && npm run test:schema && npm run test:env && npm run test:diagrams",
-    "test:unit": "vitest run"
+    "test": "npm run typecheck && npm run test:unit && npm run test:schema && npm run test:env && npm run test:n8n && npm run test:diagrams",
+    "test:unit": "vitest run",
+    "n8n:build": "node scripts/build-n8n.mjs",
+    "test:e2e": "playwright test",
+    "test:n8n": "node --test scripts/n8n.test.mjs"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "11.17.0",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "22.20.5",
     "@types/react": "19.3.0",

@@ -1,0 +1,24 @@
+# Local n8n for the agent runner and scheduler.
+#   docker compose up -d   ->  http://localhost:5678
+#   npm run n8n:import     ->  installs and activates the two workflows
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.43.7
+    restart: unless-stopped
+    ports:
+      - '5678:5678'
+    env_file: .env
+    environment:
+      # n8n reaches the Next.js app on your machine.
+      APP_INTERNAL_URL: http://host.docker.internal:3000
+      # The workflows read N8N_WEBHOOK_SECRET / APP_INTERNAL_URL and sign with Node's crypto.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: 'false'
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      GENERIC_TIMEZONE: UTC
+      N8N_SECURE_COOKIE: 'false'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - n8n_data:/home/node/.n8n
+volumes:
+  n8n_data:

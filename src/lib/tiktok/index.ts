@@ -10,11 +10,11 @@ import { TikTokError, type TikTokAds, type TikTokPosting } from './types';
 
 export * from './types';
 
-let mock: MockTikTok | undefined;
-/** The shared in-memory TikTok used when MOCK_PROVIDERS=true. */
+const g = globalThis as unknown as { __mockTikTok?: MockTikTok };
+/** The shared in-memory TikTok used when MOCK_PROVIDERS=true (one per process). */
 export function mockTikTok(reset = false) {
-  if (reset || !mock) mock = new MockTikTok();
-  return mock;
+  if (reset || !g.__mockTikTok) g.__mockTikTok = new MockTikTok();
+  return g.__mockTikTok;
 }
 
 export class NotConnectedError extends Error {

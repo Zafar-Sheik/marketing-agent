@@ -9,5 +9,7 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 60_000,
     setupFiles: ['src/test/setup.ts'],
+    // next-auth imports 'next/server' without an extension; let Vite resolve it.
+    server: { deps: { inline: ['next-auth', '@auth/core'] } },
   },
 });

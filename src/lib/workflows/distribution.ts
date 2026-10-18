@@ -326,7 +326,8 @@ export const organicPublish: WorkflowDef = {
     async wait({ db, run }) {
       const [post] = await db.select().from(schema.organicPosts).where(eq(schema.organicPosts.id, run.subjectId!));
       const seconds = Math.ceil((post.scheduledFor.getTime() - Date.now()) / 1000);
-      return seconds > 30 ? { next: 'publish', waitSeconds: seconds } : { next: 'publish' };
+      // Re-check after every wake-up: a runner may wake early (capped waits, restarts), and must never publish early.
+      return seconds > 30 ? { next: 'wait', waitSeconds: seconds } : { next: 'publish' };
     },
 
     async publish({ db, providers: p, run, state, log }) {

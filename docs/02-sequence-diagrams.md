@@ -7,17 +7,17 @@ flowchart LR
     subgraph Client
         B[Browser<br/>Next.js + Aceternity UI]
     end
-    subgraph App [Next.js on Vercel]
-        UI[App Router pages<br/>Server Components]
+    subgraph App [Next.js]
+        UI[App Router pages<br/>Server Components + Server Actions]
         API[Route handlers<br/>/api/*]
-        CB["/api/n8n/callback<br/>HMAC verified"]
+        STEPS["/api/internal/steps<br/>agent step functions, HMAC verified"]
     end
     subgraph Data
         NEON[(NeonDB Postgres<br/>+ pgvector)]
         S3[(AWS S3<br/>assets bucket)]
     end
     subgraph Orchestration
-        N8N[n8n workflows<br/>queue mode + workers]
+        N8N[n8n<br/>agent-runner + scheduler]
     end
     subgraph AI [AI providers]
         CL[Anthropic Claude<br/>strategy, copy, QA, vision]
@@ -26,36 +26,49 @@ flowchart LR
         VID[Runway video gen]
         TTS[ElevenLabs voice]
         ED[Creatomate render/edit]
-        RS[Tavily web research]
+        RS[Tavily web research<br/>incl. TikTok Creative Center pages]
     end
     subgraph TikTok
         TA[Marketing API<br/>Ads Manager]
-        TP[Content Posting API]
-        TC[Creative Center trends]
+        TP[Content Posting API<br/>+ Display API]
     end
 
     B <--> UI
     B -- presigned PUT --> S3
     UI --> API
+    UI <--> NEON
     API <--> NEON
-    API -- signed webhook --> N8N
-    N8N -- signed callback --> CB
-    CB --> NEON
-    N8N <--> S3
-    N8N --> CL & EMB & IMG & VID & TTS & ED & RS
-    N8N --> TA & TP & TC
+    UI -- signed job --> N8N
+    N8N -- "signed: run step N" --> STEPS
+    STEPS -- "next step + wait" --> N8N
+    STEPS <--> NEON
+    STEPS <--> S3
+    STEPS --> CL & EMB & IMG & VID & TTS & ED & RS
+    STEPS --> TA & TP
 ```
 
-**Contract between Next.js and n8n** (used in every diagram below):
+**How the agents run.** Every automated job (brand training, monthly plan, one creative, an ad launch, a post,
+daily optimisation, a logo request, a monthly report) is a workflow made of small, idempotent **steps**
+written in TypeScript (`src/lib/workflows/*`). Next.js owns the logic, the database and every provider call,
+so it is typed and unit-tested. n8n owns *time*: it calls one step, waits as long as the step asks (20 seconds
+for a video render, 15 minutes for TikTok ad review, until the scheduled post time), then calls the next.
+Waits are durable in n8n's database, so restarts and deploys never lose a job.
 
-- Next.js inserts an `agent_runs` row, then `POST {N8N_BASE_URL}/webhook/{workflow}` with
-  `{ run_id, company_id, subject, payload }` and header `X-Signature: sha256=HMAC(N8N_WEBHOOK_SECRET, body)`.
-- n8n answers `202` immediately and works asynchronously; long jobs never block an HTTP request.
-- n8n reports progress and results to `POST /api/n8n/callback` with the same HMAC. Next.js is the
-  **only writer to Neon**, so validation and authorisation live in one place.
-- n8n gets brand context from `GET /api/internal/companies/{id}/context?query=…` (HMAC), which returns
-  the current brand bible plus top-k `knowledge_chunks` by cosine similarity.
-- `run_id` is the idempotency key: a re-delivered webhook is a no-op.
+- Starting a job: Next.js inserts an `agent_runs` row and sends `POST {N8N_BASE_URL}/webhook/agent-runner`
+  with `{ run_id, step }`, signed `X-Signature: sha256=HMAC(N8N_WEBHOOK_SECRET, "{timestamp}.{body}")` and
+  `X-Timestamp` (requests older than 5 minutes are rejected).
+- n8n answers `202`, verifies the signature, and loops: `POST /api/internal/steps` (signed the same way) →
+  `{ done }` or `{ next, waitSeconds }` → Wait node → next step.
+- A step that throws marks the run failed and puts the error on the thing it was working on (e.g. the
+  creative shows "Production failed · Retry"). Replayed steps on a finished run are no-ops; `idempotency_key`
+  stops duplicate runs (one optimisation per company per day, one report per month, one launch per campaign).
+- Scheduled jobs come from n8n's scheduler workflow: `POST /api/internal/cron/{produce|optimise|monthly-reports}`.
+- `DISPATCH_MODE=inline` runs the same steps inside the Next.js server instead of n8n, for local development
+  and the test-suite.
+
+In the diagrams below, a participant named `n8n · <workflow>` stands for that workflow's steps: each arrow it
+sends to a provider happens inside a Next.js step that n8n invoked. Wherever a diagram shows a `callback`
+to the API, the step writes to Neon directly.
 
 ---
 
@@ -141,7 +154,7 @@ sequenceDiagram
     participant DB as NeonDB
     participant N as n8n · monthly-plan
     participant RS as Tavily
-    participant TC as TikTok Creative Center
+    participant TC as TikTok Creative Center (via web research)
     participant CL as Claude
     participant S3 as AWS S3
 
@@ -432,9 +445,7 @@ sequenceDiagram
     loop Each concept
         N->>IMG: Generate logo on transparent background
         IMG-->>N: PNG
-        N->>CL: Write clean SVG reconstruction for vector use + QA legibility at 32px
-        CL-->>N: SVG + score
-        N->>S3: PUT PNG, SVG, mockups (app icon, TikTok avatar)
+        N->>S3: PUT transparent PNG
         N->>API: callback creative.ready (format=logo)
         API->>DB: INSERT creatives, assets, creative_assets
     end

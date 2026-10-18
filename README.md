@@ -1,69 +1,83 @@
-# Marketing Agent — autonomous TikTok marketing agency
+# Marketing Agent: an autonomous TikTok marketing agency
 
-Create a client, give it the brand (colours, name, details, portfolio), and the system learns the brand,
-researches the market, writes the monthly plan, designs and edits the videos, posts and adverts, buys the
-media in TikTok Ads Manager with a calculated budget and audience, publishes, optimises daily, designs
-logos on request, and documents everything in a monthly report.
+Add a client with their brand colours, details and past work. Tell it this month's goals and, if you like, what to make this week. The agents learn the brand, research the market, write the monthly plan, script, design, generate and edit the videos and posts, put the right budget and audience behind them in TikTok Ads Manager, publish, optimise daily, design logos on request, and send a documented monthly report. Anything that spends money or goes public waits for your approval, unless you switch on autopilot.
 
-**Stack:** Next.js (App Router) + Aceternity UI · n8n (orchestration) · NeonDB Postgres + pgvector · AWS S3 ·
-Claude (strategy, copy, QA) · OpenAI (embeddings, images) · Runway (video) · ElevenLabs (voice) ·
-Creatomate (editing/render) · Tavily (research) · TikTok Marketing API + Content Posting API · Resend (email)
+**Stack:** Next.js 16 (App Router, Server Actions) with Aceternity-style UI · n8n (durable orchestration) · NeonDB Postgres with pgvector · AWS S3 · Claude (strategy, copywriting, research analysis, brand QA, vision) · OpenAI (embeddings, images) · Runway (video) · ElevenLabs (voice-over) · Creatomate (editing) · Tavily (research) · TikTok Marketing API and Content Posting API · Resend (email)
 
-## Design documents
+## Try it in two minutes, no keys needed
 
-| | Document | What's inside |
-|---|---|---|
-| 1 | [User flow](docs/01-user-flow.md) | End-to-end flow with approval gates, screen map, creative/plan/ad state machines, guardrails |
-| 2 | [Sequence diagrams](docs/02-sequence-diagrams.md) | Architecture, Next.js ↔ n8n contract, 7 sequences: onboarding & training, research & plan, creative production, ads + organic distribution, daily optimisation, logos, month-end report |
-| 3 | [ERD](docs/03-erd.md) | 28 tables, relationships, design decisions |
-| — | [`db/schema.sql`](db/schema.sql) | The Neon schema the ERD is drawn from |
+```bash
+npm install
+npm run env:setup            # creates .env with generated secrets
+# in .env set: MOCK_PROVIDERS=true   (simulates every provider and TikTok; spends nothing)
+npm run dev                  # http://localhost:3000
+```
 
-GitHub renders the Mermaid diagrams inline. Pre-rendered SVGs are in [`docs/diagrams/`](docs/diagrams/).
+With no keys, the app uses an embedded Postgres in `.data/`, stores uploads on disk, runs the agents inside the Next.js server (`DISPATCH_MODE=inline`), and lets you sign in with just an email. The whole flow works end to end: client, training, plan, content, approvals, ads, posts, logos and the PDF report, with placeholder media.
+
+## Going live: you only paste API keys
+
+1. **Keys.** Open `.env` and replace each `replace-me`. `npm run env:check` lists what is still missing. Set `MOCK_PROVIDERS=false`.
+2. **Neon.** Create a project, paste the pooled `DATABASE_URL` and the direct `DATABASE_URL_UNPOOLED`, then run `npm run db:migrate`.
+3. **S3.** Create a private bucket, set `S3_BUCKET` and `AWS_REGION`, and apply `infra/s3-cors.json` (add your domain) so browsers can upload straight to S3:
+   `aws s3api put-bucket-cors --bucket <bucket> --cors-configuration file://infra/s3-cors.json`
+4. **n8n.** `docker compose up -d`, open http://localhost:5678, create an API key (Settings › n8n API), put it in `N8N_API_KEY`, then run `npm run n8n:import` and set `DISPATCH_MODE=n8n`. For a hosted n8n, set `N8N_BASE_URL` and give n8n the env vars `N8N_WEBHOOK_SECRET`, `APP_INTERNAL_URL` (your app's URL), `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` and `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.
+5. **Google sign-in.** Create an OAuth client with redirect `https://<app>/api/auth/callback/google` and fill in `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`. While these are empty in development, email-only sign-in is used.
+6. **TikTok.**
+   - *Ads:* create a Marketing API app at business-api.tiktok.com with redirect `https://<app>/api/tiktok/callback?kind=ads`, then fill in `TIKTOK_ADS_APP_ID` and `TIKTOK_ADS_APP_SECRET`.
+   - *Organic posting:* create an app at developers.tiktok.com with Login Kit and Content Posting API, redirect `https://<app>/api/tiktok/callback?kind=posting`, then fill in `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET`. Verify your S3 or app domain for `PULL_FROM_URL`.
+   - Keep `TIKTOK_SANDBOX=true` until TikTok approves the apps.
+7. **Deploy** to Vercel (or any Node host) with the same env vars, and set `NEXT_PUBLIC_APP_URL`.
+
+## How it works
+
+| | |
+|---|---|
+| [User flow](docs/01-user-flow.md) | Screens, approval gates, state machines, guardrails |
+| [Sequence diagrams](docs/02-sequence-diagrams.md) | Architecture, the Next.js ↔ n8n contract, every workflow step by step |
+| [ERD](docs/03-erd.md) | 28 tables and why they are shaped the way they are |
+
+Every automated job is a workflow of small TypeScript steps in `src/lib/workflows/`. n8n's single **agent-runner** workflow calls `/api/internal/steps` for each one. It waits as long as each step asks (a video render, TikTok ad review, the scheduled post time) and those waits survive restarts. The **scheduler** workflow triggers content production hourly, ad optimisation daily, and monthly reports.
+
+| Workflow | What it does |
+|---|---|
+| `brand-training` | Captions the portfolio with vision, reads the website, embeds everything into pgvector brand memory, and writes a versioned brand bible |
+| `monthly-plan` | Researches trends, competitors and audiences (with citations), then writes the strategy, pillars, budget split and a dated content calendar inside the budget |
+| `creative-production` | Writes the concept, hook, script and storyboard; creates key frames, video clips and voice-over; does a branded edit (captions, logo, end card); then runs a vision brand-QA. Anything scoring below 0.8 is remade (up to 3 attempts) |
+| `ads-propose` → `ads-launch` | Calculates the budget (capped by what is left this month, paced over the flight) and picks the audience from the research. After approval, creates the campaign in TikTok *paused*, waits for TikTok review, then enables it |
+| `organic-publish` | Waits for the scheduled time, then publishes the video or photo carousel and confirms it went live |
+| `optimise` | Daily metrics sync, then budget shifts, pauses and new-variant requests within guardrails; anything bigger asks you |
+| `logo-design` | Brand-aware logo concepts as transparent PNGs. Picking one makes it the brand logo |
+| `monthly-report` | KPI results, documentation for every advert and logo, research recap and recommendations, as a branded PDF, emailed to you |
 
 ## Tested
 
 ```bash
-npm install
-npm test
+npm test          # typecheck, unit + integration, schema, env tooling, diagrams
+npm run test:e2e  # real browser, full operator journey (offline providers)
 ```
 
-- `test:diagrams` renders every Mermaid block in `docs/` with the real Mermaid engine in headless Chromium.
-  A diagram with a syntax error fails the build.
-- `test:schema` loads `db/schema.sql` into an in-memory Postgres (PGlite + pgvector), checks that **every
-  table, column and relationship in the ERD exists in the schema** (so the diagram can't drift), and runs a
-  full client lifecycle: onboarding → embeddings + similarity search → goals → versioned plan → creative
-  lineage → campaign/ad group/ad/metrics → organic post → logo → report, plus the constraints that block
-  duplicate months, over-negative budgets, non-hex brand colours, double-executed n8n runs and deleting a
-  creative that has spend behind it.
-- `test:env` checks the `.env` tooling below.
+- **Unit tests:** budget pacing and caps, guardrails, TikTok targeting (including refusal of sensitive targeting), crypto and webhook signatures, dates, text chunking, colours.
+- **Integration tests:** a whole client month runs end to end against a real Postgres engine with the actual workflows, plus the failure paths (low brand score, provider failure, TikTok rejection, budget cap, autopilot, replayed n8n steps, double approvals).
+- **Consistency tests:** the Drizzle models, `db/schema.sql` and the ERD must match exactly, and every Mermaid diagram must render.
+- **n8n tests:** the workflow files are checked, and their signing code is run and verified against the app's verifier.
+- **End-to-end:** Playwright drives the real app through sign-in, the new-client wizard, upload, training, planning, approvals, content, ads, posting, logos and the report PDF.
 
-CI runs the same `npm test` on every push.
+## Things to know
 
-## Environment — you only paste API keys
+- **"Trained on the brand" means retrieval, not fine-tuning.** Each client's material is embedded and retrieved into every prompt, kept separate per client.
+- **TikTok doesn't allow religion targeting** (or other sensitive characteristics). Targeting uses age (18+), gender, location, language, interests and behaviours. Faith and cultural moments are handled through the creative, timing, language and location. Segments that use sensitive terms are rejected in code.
+- **Money is gated.** Each month has a hard budget cap that is re-checked right before anything is sent to TikTok. Campaigns are created paused and only enabled after your approval and TikTok's review. The optimiser can't raise the month's total.
+- **Unaudited TikTok posting apps can only post privately.** The app detects this and tells you.
+- **Video length:** generated scenes are 5 or 10 seconds, so videos run about 15–30 seconds plus an end card.
 
-```bash
-npm run env:setup   # creates .env, generates all internal secrets
-# paste your keys over each `replace-me`
-npm run env:check   # lists anything still missing
-```
+## Scripts
 
-## Things to know before building
-
-- **"Training" = retrieval (RAG), not model fine-tuning.** Client material is embedded into pgvector and
-  retrieved into every prompt. It's instant, cheap and keeps each client's data isolated.
-- **TikTok does not allow targeting by religion** (or other sensitive characteristics). The system targets on
-  age, gender, location, language, interests, behaviours, hashtags and custom/lookalike audiences, and
-  handles faith or cultural moments through creative, timing, language and location.
-- **TikTok app approval is required.** The Marketing API needs an approved developer app per advertiser, and the
-  Content Posting API posts as private until TikTok audits your app. Start with `TIKTOK_SANDBOX=true`.
-- **Money is gated.** Campaigns are created paused, the monthly budget is a hard cap, and spend and publishing
-  need approval unless the workspace is switched to autopilot.
-
-## Build roadmap
-
-1. Next.js app shell, Auth.js, Drizzle models generated from `db/schema.sql`, S3 presigned uploads
-2. Onboarding wizard + `brand-training` n8n workflow
-3. Goals → `monthly-plan` workflow (research + plan + approvals)
-4. `creative-production` workflow (video, image, carousel) + review screen
-5. `distribute` workflow (TikTok Ads + Content Posting) + OAuth
-6. `optimise` daily workflow, `logo-design`, `monthly-report` PDF
+| | |
+|---|---|
+| `npm run dev` / `build` / `start` | Next.js |
+| `npm run env:setup` / `env:check` | Create `.env` and check what is missing |
+| `npm run db:migrate` | Apply `db/schema.sql` and `db/migrations/*.sql` to Neon |
+| `npm run n8n:import` | Install and activate the n8n workflows |
+| `npm run n8n:build` | Regenerate `n8n/*.json` from `scripts/build-n8n.mjs` |
+| `npm run diagrams:render` | Re-render `docs/diagrams/*.svg` |

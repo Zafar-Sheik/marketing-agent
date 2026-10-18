@@ -39,9 +39,11 @@ const schema = z.object({
   N8N_BASE_URL: z.string().default('http://localhost:5678'),
   N8N_API_KEY: optionalKey,
   N8N_WEBHOOK_SECRET: optionalKey,
-  APP_CALLBACK_URL: z.string().default('http://localhost:3000/api/n8n/callback'),
+  APP_INTERNAL_URL: z.string().default('http://localhost:3000'),
   // n8n: hand every job to n8n. inline: run the same steps inside Next.js (local dev, tests).
   DISPATCH_MODE: z.enum(['n8n', 'inline']).default('n8n'),
+  // Inline mode only: multiply step waits by this (0.01 makes TikTok review polls near-instant in tests).
+  INLINE_WAIT_SCALE: num(1),
 
   ANTHROPIC_API_KEY: optionalKey,
   ANTHROPIC_MODEL: z.string().default('claude-opus-5-5'),

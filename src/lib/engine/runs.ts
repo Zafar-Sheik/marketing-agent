@@ -1,5 +1,5 @@
 import { after } from 'next/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { env } from '@/env';
 import { providers } from '@/lib/providers';
@@ -65,8 +65,12 @@ async function dispatch(runId: string, step: string) {
   }
 }
 
-/** Seconds the in-process driver actually waits (n8n honours the real wait). */
-let inlineWaitScale = 1;
+/**
+ * The in-process driver shortens waits by this factor (INLINE_WAIT_SCALE, e.g. 0.01 in tests) and never
+ * sleeps more than a minute at a time; steps that need real time to pass (scheduled posts) re-check and wait again.
+ * n8n always honours the full wait.
+ */
+let inlineWaitScale: number | undefined;
 export function setInlineWaitScale(scale: number) {
   inlineWaitScale = scale;
 }
@@ -76,9 +80,44 @@ export async function driveInline(runId: string, step: string, maxSteps = 500) {
   for (let i = 0; current && i < maxSteps; i++) {
     const result = await executeStep(runId, current);
     if ('done' in result) return;
-    if (result.waitSeconds) await new Promise((r) => setTimeout(r, Math.min(result.waitSeconds! * 1000 * inlineWaitScale, 60_000)));
+    const seconds = result.waitSeconds ?? 0;
+    const waitMs = seconds * 1000 * (inlineWaitScale ?? env().INLINE_WAIT_SCALE);
+    if (seconds > 3600 || waitMs > 60_000) {
+      // Long waits (scheduled posts, slow reviews) sleep in the database; resumeDueRuns() wakes them.
+      await setWakeAt(runId, new Date(Date.now() + waitMs));
+      return;
+    }
+    if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
     current = result.next;
   }
+}
+
+async function setWakeAt(runId: string, wakeAt: Date | null) {
+  await (await db())
+    .update(schema.agentRuns)
+    .set({ output: sql`jsonb_set(coalesce(${schema.agentRuns.output}, '{}'::jsonb), '{wakeAt}', ${wakeAt ? JSON.stringify(wakeAt.toISOString()) : 'null'}::jsonb)` })
+    .where(eq(schema.agentRuns.id, runId));
+}
+
+/** Inline mode: continue every sleeping run whose wake-up time has passed. */
+export async function resumeDueRuns(now = new Date()) {
+  const d = await db();
+  const due = await d
+    .select({ id: schema.agentRuns.id, output: schema.agentRuns.output })
+    .from(schema.agentRuns)
+    .where(
+      and(
+        inArray(schema.agentRuns.status, ['queued', 'running']),
+        sql`${schema.agentRuns.output}->>'wakeAt' is not null`,
+        sql`(${schema.agentRuns.output}->>'wakeAt')::timestamptz <= ${now.toISOString()}::timestamptz`,
+      ),
+    );
+  for (const run of due) {
+    await setWakeAt(run.id, null);
+    const step = (run.output as { step?: string } | null)?.step;
+    if (step) void driveInline(run.id, step).catch((e) => console.error(`[run ${run.id}]`, e));
+  }
+  return due.length;
 }
 
 /** Run one step of a run. Called by n8n through /api/internal/steps and by the inline driver. */

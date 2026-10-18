@@ -7,20 +7,22 @@ import * as schema from './schema';
 export { schema };
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-let instance: Promise<Db> | undefined;
+// Kept on globalThis: Next.js may load this module more than once per process (route handlers
+// and pages are bundled separately), and two embedded databases on one directory diverge.
+const g = globalThis as unknown as { __marketingAgentDb?: Promise<Db> };
 
 /**
  * Neon in production (`postgres://...`), or an embedded Postgres when DATABASE_URL is
  * `pglite:<dir>` / `pglite:memory`, so the whole app runs locally before Neon is set up.
  */
 export function db(): Promise<Db> {
-  instance ??= connect(env().DATABASE_URL);
-  return instance;
+  g.__marketingAgentDb ??= connect(env().DATABASE_URL);
+  return g.__marketingAgentDb;
 }
 
 /** Tests inject their own database. */
 export function setDb(next: Db | undefined) {
-  instance = next ? Promise.resolve(next) : undefined;
+  g.__marketingAgentDb = next ? Promise.resolve(next) : undefined;
 }
 
 async function connect(url: string): Promise<Db> {

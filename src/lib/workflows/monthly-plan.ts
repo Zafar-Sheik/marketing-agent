@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { schema } from '@/db';
 import { brandBrief, brandContext } from '@/lib/agents/context';
 import { MARKET_RESEARCHER, STRATEGIST } from '@/lib/agents/prompts';
-import { addDays, daysInMonth, formatMonth, isInMonth, monthEnd, monthStart, parseIsoDate } from '@/lib/domain/dates';
+import { addDays, daysInMonth, formatMonth, isInMonth, monthEnd, monthStart, parseIsoDate, toIsoDate } from '@/lib/domain/dates';
 import { fitPlannedSpend } from '@/lib/domain/budget';
 import { formatMoney } from '@/lib/domain/money';
 import { ageGroupsForRange, assertNoSensitiveTargeting, SensitiveTargetingError } from '@/lib/domain/targeting';
@@ -347,6 +347,11 @@ function mockPlan(month: string, budget: number, requests: { weekStart: string; 
       plannedSpend: 0,
       clientRequest: 0,
     });
+  }
+  // Something due today, so a fresh plan always has content to publish straight away.
+  const today = toIsoDate(new Date());
+  if (isInMonth(today, month)) {
+    items.push({ date: today, time: '00:01', format: 'short_video', pillar: 'Product hero', objective: 'awareness', brief: 'Launch post: the bestseller, up close.', isPaid: false, plannedSpend: 0, clientRequest: 0 });
   }
   for (const [n, r] of requests.entries()) {
     const date = parseIsoDate(r.weekStart) < parseIsoDate(monthStart(month)) ? monthStart(month) : r.weekStart;

@@ -10,6 +10,9 @@ let s3: S3Client | undefined;
 const client = () =>
   (s3 ??= new S3Client({
     region: env().AWS_REGION,
+    // Otherwise presigned PUT URLs carry a checksum of an empty body and browser uploads fail.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
     credentials: { accessKeyId: requireKey('AWS_ACCESS_KEY_ID'), secretAccessKey: requireKey('AWS_SECRET_ACCESS_KEY') },
   }));
 
@@ -49,9 +52,9 @@ export const s3Storage: Storage = {
  * Disk-backed stand-in for S3 (MOCK_PROVIDERS=true or no AWS keys in development).
  * Files live in .data/storage and are served by /api/dev/storage with signed URLs.
  */
-export function localStorage(root = path.resolve('.data/storage')): Storage {
+export function localStorage(root = path.resolve(/*turbopackIgnore: true*/ process.cwd(), '.data/storage')): Storage {
   const file = (key: string) => {
-    const p = path.resolve(root, key);
+    const p = path.resolve(/*turbopackIgnore: true*/ root, key);
     if (!p.startsWith(root + path.sep)) throw new Error('Invalid key');
     return p;
   };
