@@ -26,6 +26,10 @@ export function setDb(next: Db | undefined) {
 }
 
 async function connect(url: string): Promise<Db> {
+  if (url.startsWith('pglite:') && process.env.VERCEL) {
+    // Serverless file systems are read-only and short-lived: the embedded database can't work there.
+    throw new Error('DATABASE_URL is not set. Add your Neon connection string in Vercel > Settings > Environment Variables.');
+  }
   if (url.startsWith('pglite:')) {
     const target = url.slice('pglite:'.length);
     const pg = await createPglite(target === 'memory' ? undefined : target);

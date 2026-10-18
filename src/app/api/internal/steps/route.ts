@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { executeStep } from '@/lib/engine/runs';
 import { route, signedJson } from '@/lib/http';
 
-export const maxDuration = 800; // long LLM steps on Vercel Pro/Fluid
+export const maxDuration = 300; // the longest any Vercel plan allows by default; each step is one short unit of work
 
 const body = z.object({ run_id: z.string().uuid(), step: z.string().min(1) });
 

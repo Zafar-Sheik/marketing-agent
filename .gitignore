@@ -11,3 +11,4 @@ e2e/screenshots/
 e2e/.tmp-*
 test-results/
 playwright-report/
+.vercel/

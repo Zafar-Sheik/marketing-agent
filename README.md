@@ -27,7 +27,10 @@ With no keys, the app uses an embedded Postgres in `.data/`, stores uploads on d
    - *Ads:* create a Marketing API app at business-api.tiktok.com with redirect `https://<app>/api/tiktok/callback?kind=ads`, then fill in `TIKTOK_ADS_APP_ID` and `TIKTOK_ADS_APP_SECRET`.
    - *Organic posting:* create an app at developers.tiktok.com with Login Kit and Content Posting API, redirect `https://<app>/api/tiktok/callback?kind=posting`, then fill in `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET`. Verify your S3 or app domain for `PULL_FROM_URL`.
    - Keep `TIKTOK_SANDBOX=true` until TikTok approves the apps.
-7. **Deploy** to Vercel (or any Node host) with the same env vars, and set `NEXT_PUBLIC_APP_URL`.
+7. **Deploy to Vercel.** Import the repo. `vercel.json` pins the Next.js framework and its output directory, so a wrong dashboard preset or Output Directory can't break the build. Add your `.env` values under Settings › Environment Variables, and set `NEXT_PUBLIC_APP_URL` to the deployed URL.
+   - On Vercel you must use Neon (`DATABASE_URL`). Serverless file systems are read-only, so the embedded database is for local use only, and the app says so if it's missing.
+   - Use `DISPATCH_MODE=n8n`. Inline mode's background scheduler needs a long-running server, which Vercel functions aren't.
+   - Each agent step runs within the 300-second function limit available on every Vercel plan.
 
 ## How it works
 
