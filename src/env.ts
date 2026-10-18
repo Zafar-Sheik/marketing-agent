@@ -61,8 +61,12 @@ const schema = z.object({
   TIKTOK_ADS_APP_SECRET: optionalKey,
   TIKTOK_CLIENT_KEY: optionalKey,
   TIKTOK_CLIENT_SECRET: optionalKey,
-  TIKTOK_REDIRECT_URI: z.string().default('http://localhost:3000/api/tiktok/callback'),
   TIKTOK_SANDBOX: bool(true),
+  // Optional: verified domain serving the bucket, needed only for photo carousels (TikTok pulls photos by URL).
+  TIKTOK_MEDIA_BASE_URL: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
 
   RESEND_API_KEY: optionalKey,
   EMAIL_FROM: z.string().default('reports@example.com'),

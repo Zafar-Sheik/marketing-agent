@@ -21,7 +21,8 @@
     "test:unit": "vitest run",
     "n8n:build": "node scripts/build-n8n.mjs",
     "test:e2e": "playwright test",
-    "test:n8n": "node --test scripts/n8n.test.mjs"
+    "test:n8n": "node --test scripts/n8n.test.mjs",
+    "n8n:import:cloud": "node scripts/n8n-import.mjs --cloud"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "11.17.0",

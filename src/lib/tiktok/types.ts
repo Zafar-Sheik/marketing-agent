@@ -64,7 +64,9 @@ export type PostStats = { postId: string; views: number; likes: number; comments
 
 export interface TikTokPosting {
   creatorInfo(): Promise<{ privacyLevels: string[]; maxVideoSeconds: number; nickname: string }>;
-  publishVideo(input: { videoUrl: string; caption: string; privacyLevel: string }): Promise<string>;
+  /** Uploads the file itself (FILE_UPLOAD), so no domain verification is needed. */
+  publishVideo(input: { video: Buffer; caption: string; privacyLevel: string }): Promise<string>;
+  /** TikTok only accepts photos by URL from a domain verified in your developer app. */
   publishPhotos(input: { imageUrls: string[]; title: string; caption: string; privacyLevel: string }): Promise<string>;
   status(publishId: string): Promise<PublishState>;
   stats(postIds: string[]): Promise<PostStats[]>;

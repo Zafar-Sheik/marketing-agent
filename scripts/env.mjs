@@ -20,11 +20,13 @@ export function fillSecrets(text) {
   return text.replace(new RegExp(`=${GENERATE}$`, 'gm'), () => `=${randomBytes(32).toString('hex')}`);
 }
 
-// Keys that are missing, empty, or still placeholders.
+// Required keys (marked replace-me / __GENERATE__ in the template) that are missing, empty, or still placeholders.
+// Keys with a default or left blank in the template are optional.
 export function missingKeys(exampleText, envText) {
   const example = parseEnv(exampleText);
   const env = parseEnv(envText);
-  return [...example.keys()].filter((key) => {
+  const required = [...example].filter(([, v]) => v === PLACEHOLDER || v === GENERATE).map(([k]) => k);
+  return required.filter((key) => {
     const value = env.get(key);
     return value === undefined || value === '' || value === PLACEHOLDER || value === GENERATE;
   });

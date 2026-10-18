@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { agentRunner, scheduler, SIGN_JS, VERIFY_JS, NEXT_JS, CRON_SIGN_JS } from './build-n8n.mjs';
+import { agentRunner, scheduler, forCloud, SIGN_JS, VERIFY_JS, NEXT_JS, CRON_SIGN_JS } from './build-n8n.mjs';
 
 const require = createRequire(import.meta.url);
 const SECRET = 'test-secret';
@@ -14,6 +14,17 @@ const run = (code, $json, extra = {}) => new Function('require', '$json', '$env'
 test('committed workflow files match the generator', () => {
   assert.deepEqual(JSON.parse(readFileSync('n8n/agent-runner.json', 'utf8')), JSON.parse(JSON.stringify(agentRunner)));
   assert.deepEqual(JSON.parse(readFileSync('n8n/scheduler.json', 'utf8')), JSON.parse(JSON.stringify(scheduler)));
+});
+
+test('n8n Cloud copies are current and use Variables instead of environment variables', () => {
+  for (const [file, wf] of [['agent-runner', agentRunner], ['scheduler', scheduler]]) {
+    const cloud = JSON.parse(readFileSync(`n8n/cloud/${file}.json`, 'utf8'));
+    assert.deepEqual(cloud, forCloud(wf));
+    const text = JSON.stringify(cloud);
+    assert.ok(!text.includes('$env.'), `${file} still reads $env`);
+    assert.match(text, /\$vars\.N8N_WEBHOOK_SECRET/);
+    assert.match(text, /\$vars\.APP_INTERNAL_URL/);
+  }
 });
 
 test('every connection points at a node that exists', () => {

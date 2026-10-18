@@ -84,8 +84,8 @@ export class MockTikTok {
   posting(): TikTokPosting {
     return {
       creatorInfo: async () => ({ privacyLevels: ['PUBLIC_TO_EVERYONE', 'SELF_ONLY'], maxVideoSeconds: 600, nickname: 'mock_brand' }),
-      publishVideo: async (input) => {
-        this.calls.push({ method: 'publishVideo', args: input });
+      publishVideo: async ({ video, ...input }) => {
+        this.calls.push({ method: 'publishVideo', args: { ...input, bytes: video.length } });
         const id = this.id('p');
         this.publishes.set(id, 0);
         return id;

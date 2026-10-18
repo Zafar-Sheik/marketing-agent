@@ -17,6 +17,8 @@ With no keys, the app uses an embedded Postgres in `.data/`, stores uploads on d
 
 ## Going live: you only paste API keys
 
+**Step-by-step for every key and for n8n: [docs/04-setup-guide.md](docs/04-setup-guide.md).** Short version:
+
 1. **Keys.** Open `.env` and replace each `replace-me`. `npm run env:check` lists what is still missing. Set `MOCK_PROVIDERS=false`.
 2. **Neon.** Create a project, paste the pooled `DATABASE_URL` and the direct `DATABASE_URL_UNPOOLED`, then run `npm run db:migrate`.
 3. **S3.** Create a private bucket, set `S3_BUCKET` and `AWS_REGION`, and apply `infra/s3-cors.json` (add your domain) so browsers can upload straight to S3:
@@ -24,8 +26,8 @@ With no keys, the app uses an embedded Postgres in `.data/`, stores uploads on d
 4. **n8n.** `docker compose up -d`, open http://localhost:5678, create an API key (Settings › n8n API), put it in `N8N_API_KEY`, then run `npm run n8n:import` and set `DISPATCH_MODE=n8n`. For a hosted n8n, set `N8N_BASE_URL` and give n8n the env vars `N8N_WEBHOOK_SECRET`, `APP_INTERNAL_URL` (your app's URL), `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` and `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.
 5. **Google sign-in.** Create an OAuth client with redirect `https://<app>/api/auth/callback/google` and fill in `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`. While these are empty in development, email-only sign-in is used.
 6. **TikTok.**
-   - *Ads:* create a Marketing API app at business-api.tiktok.com with redirect `https://<app>/api/tiktok/callback?kind=ads`, then fill in `TIKTOK_ADS_APP_ID` and `TIKTOK_ADS_APP_SECRET`.
-   - *Organic posting:* create an app at developers.tiktok.com with Login Kit and Content Posting API, redirect `https://<app>/api/tiktok/callback?kind=posting`, then fill in `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET`. Verify your S3 or app domain for `PULL_FROM_URL`.
+   - *Ads:* create a Marketing API app at business-api.tiktok.com with redirect `https://<app>/api/tiktok/callback/ads`, then fill in `TIKTOK_ADS_APP_ID` and `TIKTOK_ADS_APP_SECRET`.
+   - *Organic posting:* create an app at developers.tiktok.com with Login Kit and Content Posting API, redirect `https://<app>/api/tiktok/callback/posting`, then fill in `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET`. Videos are uploaded directly; only photo carousels need `TIKTOK_MEDIA_BASE_URL` (a domain verified with TikTok).
    - Keep `TIKTOK_SANDBOX=true` until TikTok approves the apps.
 7. **Deploy to Vercel.** Import the repo. `vercel.json` pins the Next.js framework and its output directory, so a wrong dashboard preset or Output Directory can't break the build. Add your `.env` values under Settings › Environment Variables, and set `NEXT_PUBLIC_APP_URL` to the deployed URL.
    - On Vercel you must use Neon (`DATABASE_URL`). Serverless file systems are read-only, so the embedded database is for local use only, and the app says so if it's missing.
@@ -39,6 +41,7 @@ With no keys, the app uses an embedded Postgres in `.data/`, stores uploads on d
 | [User flow](docs/01-user-flow.md) | Screens, approval gates, state machines, guardrails |
 | [Sequence diagrams](docs/02-sequence-diagrams.md) | Architecture, the Next.js ↔ n8n contract, every workflow step by step |
 | [ERD](docs/03-erd.md) | 28 tables and why they are shaped the way they are |
+| [Setup guide](docs/04-setup-guide.md) | Getting every API key, hosting n8n and installing the flows |
 
 Every automated job is a workflow of small TypeScript steps in `src/lib/workflows/`. n8n's single **agent-runner** workflow calls `/api/internal/steps` for each one. It waits as long as each step asks (a video render, TikTok ad review, the scheduled post time) and those waits survive restarts. The **scheduler** workflow triggers content production hourly, ad optimisation daily, and monthly reports.
 
@@ -81,6 +84,6 @@ npm run test:e2e  # real browser, full operator journey (offline providers)
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run env:setup` / `env:check` | Create `.env` and check what is missing |
 | `npm run db:migrate` | Apply `db/schema.sql` and `db/migrations/*.sql` to Neon |
-| `npm run n8n:import` | Install and activate the n8n workflows |
+| `npm run n8n:import` / `n8n:import:cloud` | Install and activate the n8n workflows (self-hosted / n8n Cloud) |
 | `npm run n8n:build` | Regenerate `n8n/*.json` from `scripts/build-n8n.mjs` |
 | `npm run diagrams:render` | Re-render `docs/diagrams/*.svg` |

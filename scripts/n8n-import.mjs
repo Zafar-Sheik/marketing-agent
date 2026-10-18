@@ -26,9 +26,11 @@ async function api(method, path, body) {
   return text ? JSON.parse(text) : {};
 }
 
+// --cloud imports the n8n Cloud copies, which read settings from n8n Variables.
+const dir = process.argv.includes('--cloud') ? 'n8n/cloud' : 'n8n';
 const existing = (await api('GET', '/workflows?limit=250')).data ?? [];
-for (const file of readdirSync('n8n').filter((f) => f.endsWith('.json')).sort()) {
-  const { name, nodes, connections, settings } = JSON.parse(readFileSync(`n8n/${file}`, 'utf8'));
+for (const file of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
+  const { name, nodes, connections, settings } = JSON.parse(readFileSync(`${dir}/${file}`, 'utf8'));
   const found = existing.find((w) => w.name === name);
   const payload = { name, nodes, connections, settings };
   const wf = found ? await api('PUT', `/workflows/${found.id}`, payload) : await api('POST', '/workflows', payload);

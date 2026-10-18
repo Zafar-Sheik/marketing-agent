@@ -1,6 +1,6 @@
 // Generates the n8n workflow files in n8n/ (run: node scripts/build-n8n.mjs).
 // Kept as code so the signing logic is shared with tests and can't drift.
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 export const SIGN_JS = `const crypto = require('crypto');
 const body = JSON.stringify({ run_id: $json.run_id, step: $json.step });
@@ -136,8 +136,17 @@ export const scheduler = {
   active: false,
 };
 
+/**
+ * n8n Cloud doesn't let you set environment variables, so the Cloud copies read the same two
+ * settings from n8n Variables ($vars) instead of $env.
+ */
+export const forCloud = (wf) => JSON.parse(JSON.stringify(wf).replaceAll('$env.', '$vars.'));
+
 if (process.argv[1]?.endsWith('build-n8n.mjs')) {
-  writeFileSync('n8n/agent-runner.json', JSON.stringify(agentRunner, null, 2) + '\n');
-  writeFileSync('n8n/scheduler.json', JSON.stringify(scheduler, null, 2) + '\n');
-  console.log('Wrote n8n/agent-runner.json and n8n/scheduler.json');
+  mkdirSync('n8n/cloud', { recursive: true });
+  for (const [file, wf] of [['agent-runner', agentRunner], ['scheduler', scheduler]]) {
+    writeFileSync(`n8n/${file}.json`, JSON.stringify(wf, null, 2) + '\n');
+    writeFileSync(`n8n/cloud/${file}.json`, JSON.stringify(forCloud(wf), null, 2) + '\n');
+  }
+  console.log('Wrote n8n/*.json (self-hosted) and n8n/cloud/*.json (n8n Cloud)');
 }

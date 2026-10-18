@@ -155,3 +155,21 @@ describe('dates', () => {
     expect(() => parseIsoDate('2026-02-30')).toThrow();
   });
 });
+
+describe('TikTok upload chunking', async () => {
+  const { uploadChunks } = await import('@/lib/tiktok/posting');
+  it('sends small and medium files in one chunk', () => {
+    expect(uploadChunks(3_000_000)).toEqual({ chunkSize: 3_000_000, chunks: [{ start: 0, end: 2_999_999 }] });
+    expect(uploadChunks(64_000_000).chunks).toHaveLength(1);
+  });
+  it('splits large files into 10 MB chunks and merges the remainder into the last', () => {
+    const size = 150_000_123;
+    const { chunkSize, chunks } = uploadChunks(size);
+    expect(chunkSize).toBe(10_000_000);
+    expect(chunks).toHaveLength(15);
+    expect(chunks.at(-1)).toEqual({ start: 140_000_000, end: size - 1 });
+    // Contiguous, complete, and every chunk within TikTok's 5-128 MB bounds.
+    chunks.forEach((c, i) => i && expect(c.start).toBe(chunks[i - 1].end + 1));
+    expect(chunks.every((c) => c.end - c.start + 1 >= 5_000_000 && c.end - c.start + 1 <= 128_000_000)).toBe(true);
+  });
+});

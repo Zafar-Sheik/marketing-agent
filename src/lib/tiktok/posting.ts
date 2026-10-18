@@ -26,12 +26,25 @@ export function livePosting(accessToken: string): TikTokPosting {
       );
       return { privacyLevels: d.privacy_level_options, maxVideoSeconds: d.max_video_post_duration_sec, nickname: d.creator_nickname };
     },
-    async publishVideo({ videoUrl, caption, privacyLevel }) {
-      const d = await call<{ publish_id: string }>('/post/publish/video/init/', {
+    async publishVideo({ video, caption, privacyLevel }) {
+      // FILE_UPLOAD: we send the bytes, so no domain verification is needed (unlike PULL_FROM_URL).
+      const plan = uploadChunks(video.length);
+      const d = await call<{ publish_id: string; upload_url: string }>('/post/publish/video/init/', {
         post_info: { title: caption.slice(0, 2200), privacy_level: privacyLevel, disable_comment: false, disable_duet: false, disable_stitch: false },
-        // PULL_FROM_URL requires the bucket's domain to be verified in the TikTok developer portal.
-        source_info: { source: 'PULL_FROM_URL', video_url: videoUrl },
+        source_info: { source: 'FILE_UPLOAD', video_size: video.length, chunk_size: plan.chunkSize, total_chunk_count: plan.chunks.length },
       });
+      for (const { start, end } of plan.chunks) {
+        const res = await fetch(d.upload_url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'video/mp4',
+            'Content-Length': String(end - start + 1),
+            'Content-Range': `bytes ${start}-${end}/${video.length}`,
+          },
+          body: new Uint8Array(video.subarray(start, end + 1)),
+        });
+        if (!res.ok) throw new TikTokError(res.status, `video upload failed at bytes ${start}-${end}: ${(await res.text()).slice(0, 200)}`);
+      }
       return d.publish_id;
     },
     async publishPhotos({ imageUrls, title, caption, privacyLevel }) {
@@ -71,4 +84,21 @@ export function livePosting(accessToken: string): TikTokPosting {
       }));
     },
   };
+}
+
+const MB = 1_000_000;
+const SINGLE_CHUNK_MAX = 64 * MB;
+const CHUNK = 10 * MB;
+
+/**
+ * TikTok FILE_UPLOAD chunking: files up to 64 MB go in one chunk; larger files use 10 MB chunks
+ * (allowed range 5-64 MB) and the remainder is merged into the last chunk (allowed up to 128 MB).
+ */
+export function uploadChunks(size: number) {
+  if (size <= 0) throw new Error('Empty video');
+  if (size <= SINGLE_CHUNK_MAX) return { chunkSize: size, chunks: [{ start: 0, end: size - 1 }] };
+  const count = Math.floor(size / CHUNK);
+  if (count > 1000) throw new Error('Video too large for TikTok upload');
+  const chunks = Array.from({ length: count }, (_, i) => ({ start: i * CHUNK, end: i === count - 1 ? size - 1 : (i + 1) * CHUNK - 1 }));
+  return { chunkSize: CHUNK, chunks };
 }

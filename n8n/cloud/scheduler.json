@@ -1,0 +1,270 @@
+{
+  "name": "Marketing Agent · scheduler",
+  "nodes": [
+    {
+      "id": "every-hour",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "produce-due-content",
+      "name": "Produce due content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "job",
+              "name": "job",
+              "value": "produce",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "daily-06-00",
+      "name": "Daily 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "optimise-ads",
+      "name": "Optimise ads",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "job",
+              "name": "job",
+              "value": "optimise",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "daily-07-00",
+      "name": "Daily 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        500
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "monthly-reports",
+      "name": "Monthly reports",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        500
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "job",
+              "name": "job",
+              "value": "monthly-reports",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sign-job",
+      "name": "Sign job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const crypto = require('crypto');\nconst body = JSON.stringify({ job: $json.job });\nconst ts = Math.floor(Date.now() / 1000);\nconst sig = 'sha256=' + crypto.createHmac('sha256', $vars.N8N_WEBHOOK_SECRET).update(ts + '.' + body).digest('hex');\nreturn { json: { job: $json.job, body, sig, ts: String(ts) } };"
+      }
+    },
+    {
+      "id": "run-job",
+      "name": "Run job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.APP_INTERNAL_URL }}/api/internal/cron/{{ $json.job }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "X-Timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 900000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [
+        [
+          {
+            "node": "Produce due content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Produce due content": {
+      "main": [
+        [
+          {
+            "node": "Sign job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 06:00": {
+      "main": [
+        [
+          {
+            "node": "Optimise ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optimise ads": {
+      "main": [
+        [
+          {
+            "node": "Sign job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 07:00": {
+      "main": [
+        [
+          {
+            "node": "Monthly reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Monthly reports": {
+      "main": [
+        [
+          {
+            "node": "Sign job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign job": {
+      "main": [
+        [
+          {
+            "node": "Run job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

@@ -2,6 +2,11 @@ import { env, requireKey } from '@/env';
 import { marketingApiBase } from './ads';
 import { TikTokError } from './types';
 
+/** The exact redirect URLs to register in TikTok's developer portals. */
+export function callbackUrl(kind: 'ads' | 'posting') {
+  return `${env().NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/tiktok/callback/${kind}`;
+}
+
 export const POSTING_SCOPES = ['user.info.basic', 'video.publish', 'video.list'];
 
 /** Ads Manager authorisation (advertiser grants the app access to ad accounts). */
@@ -9,7 +14,7 @@ export function adsAuthorizeUrl(state: string) {
   const u = new URL('https://business-api.tiktok.com/portal/auth');
   u.searchParams.set('app_id', requireKey('TIKTOK_ADS_APP_ID'));
   u.searchParams.set('state', state);
-  u.searchParams.set('redirect_uri', `${env().TIKTOK_REDIRECT_URI}?kind=ads`);
+  u.searchParams.set('redirect_uri', callbackUrl('ads'));
   return u.toString();
 }
 
@@ -30,7 +35,7 @@ export function postingAuthorizeUrl(state: string) {
   u.searchParams.set('client_key', requireKey('TIKTOK_CLIENT_KEY'));
   u.searchParams.set('scope', POSTING_SCOPES.join(','));
   u.searchParams.set('response_type', 'code');
-  u.searchParams.set('redirect_uri', `${env().TIKTOK_REDIRECT_URI}?kind=posting`);
+  u.searchParams.set('redirect_uri', callbackUrl('posting'));
   u.searchParams.set('state', state);
   return u.toString();
 }
@@ -55,7 +60,7 @@ async function tokenRequest(params: Record<string, string>) {
 }
 
 export function exchangePostingCode(code: string) {
-  return tokenRequest({ code, grant_type: 'authorization_code', redirect_uri: `${env().TIKTOK_REDIRECT_URI}?kind=posting` });
+  return tokenRequest({ code, grant_type: 'authorization_code', redirect_uri: callbackUrl('posting') });
 }
 
 export function refreshPostingToken(refreshToken: string) {

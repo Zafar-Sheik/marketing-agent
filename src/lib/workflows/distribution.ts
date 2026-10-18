@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, notInArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { schema, type Db } from '@/db';
+import { env } from '@/env';
+import type { Providers } from '@/lib/providers';
 import { brandBrief, brandContext } from '@/lib/agents/context';
 import { MEDIA_BUYER } from '@/lib/agents/prompts';
 import { assertWithinMonthCap, calculatePlacementBudget } from '@/lib/domain/budget';
@@ -344,12 +346,12 @@ export const organicPublish: WorkflowDef = {
       let publishId: string;
       const final = files.find((f) => f.role === 'final');
       if (final) {
-        publishId = await posting.publishVideo({ videoUrl: await p.storage.presignGet(final.asset.s3Key, 3600), caption, privacyLevel: privacy });
+        publishId = await posting.publishVideo({ video: await p.storage.get(final.asset.s3Key), caption, privacyLevel: privacy });
       } else {
         const slides = files.filter((f) => f.role === 'slide');
         if (!slides.length) throw new Error('Nothing to publish: the creative has no final video or slides.');
         publishId = await posting.publishPhotos({
-          imageUrls: await Promise.all(slides.map((s) => p.storage.presignGet(s.asset.s3Key, 3600))),
+          imageUrls: await Promise.all(slides.map((s) => photoUrl(p, s.asset.s3Key))),
           title: creative.hook ?? '',
           caption,
           privacyLevel: privacy,
@@ -395,3 +397,14 @@ export const organicPublish: WorkflowDef = {
   },
 };
 
+
+/**
+ * Photo posts must come from a domain verified in your TikTok developer app. Set TIKTOK_MEDIA_BASE_URL to a
+ * verified domain that serves the bucket (e.g. a CloudFront distribution on media.yourbrand.com).
+ */
+async function photoUrl(p: Providers, key: string) {
+  const base = env().TIKTOK_MEDIA_BASE_URL;
+  if (base) return `${base.replace(/\/$/, '')}/${key}`;
+  if (env().MOCK_PROVIDERS) return p.storage.presignGet(key, 3600);
+  throw new Error('Photo carousels need TIKTOK_MEDIA_BASE_URL: a domain verified in your TikTok developer app that serves your media bucket. Videos post without it.');
+}
