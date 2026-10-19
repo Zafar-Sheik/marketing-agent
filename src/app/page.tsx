@@ -1,5 +1,6 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { BarChart3, Clapperboard, Megaphone, Palette, Search, Sparkles } from 'lucide-react';
+import { ArrowRight, BarChart3, Bot, Clapperboard, Megaphone, Palette, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { auth } from '@/auth';
 import { Spotlight } from '@/components/ui/spotlight';
 import { BentoGrid, BentoGridItem } from '@/components/ui/bento-grid';
@@ -7,13 +8,13 @@ import { LinkButton } from '@/components/ui/primitives';
 
 export const dynamic = 'force-dynamic';
 
-const FEATURES = [
-  { icon: Palette, title: 'Learns every brand', description: 'Colours, voice, portfolio and website become a brand bible every agent follows.' },
-  { icon: Search, title: 'Researches the market', description: 'Trends, sounds, competitors and audiences, cited, every month.' },
-  { icon: Sparkles, title: 'Plans the month', description: 'Pillars, calendar and budget split from your goals, revised on your feedback.' },
-  { icon: Clapperboard, title: 'Makes the content', description: 'Scripts, key frames, video, voice-over and branded edits, brand-checked before you see them.' },
-  { icon: Megaphone, title: 'Buys and posts', description: 'Budgets and audiences in TikTok Ads Manager, organic posts on schedule, guarded by approvals.' },
-  { icon: BarChart3, title: 'Reports back', description: 'Daily optimisation and a monthly PDF documenting every advert, logo and finding.' },
+const STEPS = [
+  { icon: Palette, title: 'Learns every brand', description: 'Colours, voice, past work and website become a brand bible every agent follows.', points: ['Brand colours & fonts', 'Tone of voice', 'Portfolio captions'] },
+  { icon: Search, title: 'Researches the market', description: 'Trends, sounds, competitors and audiences, with sources, every month.', points: ['TikTok trends', 'Competitor moves', 'Audience segments'] },
+  { icon: Sparkles, title: 'Plans the month', description: 'Strategy, content pillars and a dated calendar inside the budget. Revised on your feedback.', points: ['Content calendar', 'Budget split', 'Your weekly asks'] },
+  { icon: Clapperboard, title: 'Makes the content', description: 'Scripts, scenes, video, voice-over and on-brand edits, checked against the brand before you see them.', points: ['Short videos', 'Carousels', 'Logos on request'] },
+  { icon: Megaphone, title: 'Buys and posts', description: 'Budget and audience set in TikTok Ads Manager, organic posts published on schedule.', points: ['Ads created paused', 'Hard monthly cap', 'Daily optimisation'] },
+  { icon: BarChart3, title: 'Reports back', description: 'A monthly PDF documenting every advert, logo, result and next step, emailed to you.', points: ['KPIs vs targets', 'Per-advert notes', 'Recommendations'] },
 ];
 
 export default async function Landing() {
@@ -22,29 +23,56 @@ export default async function Landing() {
   return (
     <main className="relative min-h-screen overflow-hidden grid-bg">
       <Spotlight className="-top-40 left-0 md:-top-20 md:left-60" fill="#7c5cff" />
-      <div className="relative z-10 mx-auto max-w-6xl px-6 pt-28 pb-20">
+      <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-accent/20">
+            <Bot className="size-4 text-accent" />
+          </span>
+          Marketing Agent
+        </Link>
+        <LinkButton href="/signin" variant="ghost">
+          Sign in
+        </LinkButton>
+      </header>
+      <div className="relative z-10 mx-auto max-w-6xl px-6 pt-16 pb-20">
         <p className="mb-4 inline-flex rounded-full border border-line bg-panel/80 px-3 py-1 text-xs text-muted">AI marketing team for TikTok</p>
         <h1 className="max-w-3xl bg-gradient-to-b from-white to-white/60 bg-clip-text text-5xl font-bold tracking-tight text-transparent md:text-7xl">
           Your clients’ TikTok, run end to end.
         </h1>
         <p className="mt-6 max-w-xl text-lg text-muted">
-          Add a client, tell it this month’s goals. It researches, plans, designs, edits, buys media and reports — and asks before it spends.
+          Add a client, tell it this month’s goals. It researches, plans, designs, edits, buys media and reports, and asks before it spends.
         </p>
-        <div className="mt-8 flex gap-3">
-          <LinkButton href="/signin">Get started</LinkButton>
-          <LinkButton href="https://github.com/zafar-sheik/marketing-agent" variant="ghost">
-            Docs
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <LinkButton href="/signin">
+            Get started <ArrowRight className="size-4" />
           </LinkButton>
+          <span className="flex items-center gap-2 text-sm text-muted">
+            <ShieldCheck className="size-4 text-ok" /> Nothing spends money or goes public without your approval
+          </span>
         </div>
-        <BentoGrid className="mt-20">
-          {FEATURES.map(({ icon: Icon, title, description }, i) => (
+        <BentoGrid className="mt-20 md:auto-rows-auto">
+          {STEPS.map(({ icon: Icon, title, description, points }, i) => (
             <BentoGridItem
               key={title}
-              className={i === 0 || i === 3 ? 'md:col-span-2' : ''}
               title={title}
               description={description}
-              icon={<Icon className="size-5 text-accent" />}
-              header={<div className="h-full min-h-16 rounded-lg bg-gradient-to-br from-accent/20 via-panel-2 to-accent-2/10" />}
+              header={
+                <div className="flex items-start justify-between">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-accent/15">
+                    <Icon className="size-5 text-accent" />
+                  </span>
+                  <span className="font-mono text-xs text-muted">0{i + 1}</span>
+                </div>
+              }
+              icon={
+                <ul className="mb-3 flex flex-wrap gap-1.5">
+                  {points.map((p) => (
+                    <li key={p} className="rounded-full border border-line bg-panel-2 px-2 py-0.5 text-[11px] text-muted">
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              }
             />
           ))}
         </BentoGrid>
