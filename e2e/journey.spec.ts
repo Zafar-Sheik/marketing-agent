@@ -28,6 +28,15 @@ test('signs in with the development login', async () => {
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 });
 
+test('setup check tests every connection and explains what to fix', async () => {
+  await page.goto('/settings');
+  await page.getByRole('button', { name: 'Run setup check' }).click();
+  await expect(page.getByText(/\d+ working · \d+ to review · \d+ broken · \d+ not set up yet/)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText('Anthropic (Claude)')).toBeVisible();
+  await expect(page.getByText('ANTHROPIC_API_KEY is not set yet.')).toBeVisible();
+  await shot('01b-setup-check');
+});
+
 test('creates a client through the wizard', async () => {
   await page.getByRole('link', { name: 'New client' }).first().click();
   await page.locator('input[name=name]').fill('Kauai Cafe');

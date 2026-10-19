@@ -7,6 +7,40 @@ point to see what's still missing.
 > Provider dashboards move things around. If a menu name below doesn't match exactly, look for the closest
 > equivalent. The value you need, and where it goes in `.env`, stays the same.
 
+## The beginner path (recommended)
+
+If you're not sure what to choose, follow exactly this. Every choice is already made for you.
+
+| Piece | Use | Why |
+|---|---|---|
+| The app | **Vercel** | Connects to your GitHub repo and redeploys on every push |
+| n8n | **Railway**, from its n8n template | A few clicks, persistent storage included, you can set the variables n8n needs |
+| Database | **Neon** | Serverless Postgres, generous free tier |
+| Files | **AWS S3** | Cheap, reliable storage for videos and images |
+
+**Do it in this order:**
+
+| When | What | Steps |
+|---|---|---|
+| Day 1, first thing | Apply to both TikTok programs and start OpenAI organization verification. These involve waiting on reviews, so start them first. | 11, 12, 5.3 |
+| Day 1 | Install the tools on your computer (below), then create the accounts and keys | 0–10 |
+| Day 1 | Deploy the app to Vercel and n8n to Railway, then install the flows | 13 |
+| Day 1 | Open the app's **Settings › Run setup check** and fix anything red | 14 |
+| When TikTok approves | Paste the TikTok keys, run the setup check, and connect a test client | 11.5–11.7, 12.6–12.8 |
+
+**Tools on your computer (one time).** You'll run a few commands from your own computer:
+1. Install **Node.js LTS** from nodejs.org (version 22 or newer) and **Git** from git-scm.com.
+2. Install **VS Code** (code.visualstudio.com). You'll use it to edit `.env` and its built-in terminal (*Terminal › New Terminal*) to run commands.
+3. Get the code: `git clone https://github.com/zafar-sheik/marketing-agent.git`, then `cd marketing-agent` and `npm install`.
+
+**Where your keys live.**
+- On your computer: in the `.env` file in the project folder. Never commit it; it's already in `.gitignore`.
+- On Vercel: *Project › Settings › Environment Variables*. You can paste the whole contents of `.env` into the first key box and Vercel splits it into separate variables. Change `NEXT_PUBLIC_APP_URL` to your Vercel address and `DISPATCH_MODE` to `n8n`.
+- On Railway (for n8n): the n8n service's *Variables* tab (see 13a).
+
+**Test as you go.** In the app, *Settings › Run setup check* calls every service and shows ✓ working, ⚠ to review,
+✗ broken (with the fix), or "not set up yet". Run it after each key you add.
+
 ## 0 · Before you start
 
 **Start the TikTok applications first.** TikTok reviews them by hand and it can take days, so begin
@@ -195,7 +229,14 @@ docker compose up -d        # uses docker-compose.yml, reads your .env
 Open http://localhost:5678 and create the owner account. The compose file already sets everything the
 flows need.
 
-**Option B: a server (production, recommended).** Any host that runs the official Docker image works
+**Option B: Railway (production, recommended).**
+1. Sign up at **railway.com**, then **New Project › Deploy a template**, search **n8n** and deploy it (choose a
+   template that includes a Postgres database so workflows and waits are stored safely).
+2. Open the n8n service › **Settings › Networking › Generate Domain**. That address is your n8n URL.
+3. Open the n8n service › **Variables** and add the variables in the table below.
+4. Railway redeploys. Open the n8n URL and create the owner account.
+
+**Any other server.** Any host that runs the official Docker image works
 (Railway, Render, DigitalOcean, Hetzner, a VPS). Use image `docker.n8n.io/n8nio/n8n` with a persistent volume
 on `/home/node/.n8n`, and set these environment variables on n8n:
 
@@ -277,11 +318,11 @@ To change times, edit the trigger in n8n, or edit `scripts/build-n8n.mjs`, then 
 
 ## 14 · Turn it on
 
-1. `npm run env:check` shows nothing missing (optional keys like `TIKTOK_MEDIA_BASE_URL` aren't required).
+1. In the app, **Settings › Run setup check** shows everything ✓ (or only warnings you understand). `npm run env:check`
+   does a quicker offline check that nothing required is blank.
 2. Set `MOCK_PROVIDERS=false` and `DISPATCH_MODE=n8n`.
 3. Deploy (README › *Going live* step 7) with the same variables, and `NEXT_PUBLIC_APP_URL` set to the real URL.
-4. **Settings** in the app lists every integration as *configured* or *missing*.
-5. Do a first real run with a small budget: create a client, train, set goals with a modest ad budget, approve
+4. Do a first real run with a small budget: create a client, train, set goals with a modest ad budget, approve
    the plan, review the first video, and approve one ad. Watch it go *in review* and then *active* in the Ads tab.
 
 **Rough cost per client per month** depends mostly on how much video you make (Runway and Creatomate are the

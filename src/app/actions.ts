@@ -286,3 +286,10 @@ export async function setAutopilotAction(form: FormData) {
 export async function signOutAction() {
   await signOut({ redirectTo: '/' });
 }
+
+export async function runSetupChecksAction(): Promise<{ results?: import('@/lib/setup/checks').CheckResult[]; error?: string; at?: string }> {
+  const { role } = await requireUser();
+  if (role !== 'owner' && role !== 'admin') return { error: 'Only owners and admins can run the setup check.' };
+  const { runChecks } = await import('@/lib/setup/checks');
+  return { results: await runChecks(), at: new Date().toISOString() };
+}
